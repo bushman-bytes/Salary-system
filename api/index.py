@@ -40,14 +40,18 @@ if 'app' in sys.modules:
         # Re-import the package
         import app
 
-# Now load app.py as a separate module with a different name
+# Now load main.py (renamed from app.py to avoid conflict) as a separate module
 try:
-    app_file_path = project_root / "app.py"
+    # Try main.py first (if renamed)
+    app_file_path = project_root / "main.py"
+    if not app_file_path.exists():
+        # Fallback to app.py if main.py doesn't exist
+        app_file_path = project_root / "app.py"
     
     if not app_file_path.exists():
-        raise FileNotFoundError(f"app.py not found at {app_file_path}")
+        raise FileNotFoundError(f"Neither main.py nor app.py found at {project_root}")
     
-    # Load app.py as "main_app" module to avoid any conflicts
+    # Load the file as "main_app" module to avoid any conflicts
     spec = importlib.util.spec_from_file_location("main_app", app_file_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Could not create spec for {app_file_path}")

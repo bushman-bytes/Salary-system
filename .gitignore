@@ -37,3 +37,6 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Vercel
+.vercel
+
