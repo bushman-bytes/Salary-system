@@ -42,14 +42,11 @@ if 'app' in sys.modules:
 
 # Now load main.py (renamed from app.py to avoid conflict) as a separate module
 try:
-    # Try main.py first (if renamed)
+    # Load main.py (app.py has been renamed to avoid conflict)
     app_file_path = project_root / "main.py"
-    if not app_file_path.exists():
-        # Fallback to app.py if main.py doesn't exist
-        app_file_path = project_root / "app.py"
     
     if not app_file_path.exists():
-        raise FileNotFoundError(f"Neither main.py nor app.py found at {project_root}")
+        raise FileNotFoundError(f"main.py not found at {project_root}. Please ensure app.py has been renamed to main.py.")
     
     # Load the file as "main_app" module to avoid any conflicts
     spec = importlib.util.spec_from_file_location("main_app", app_file_path)

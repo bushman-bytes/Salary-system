@@ -1,2 +1,3 @@
-# Ignore app.py from being treated as a serverless function
-app.py
+# Ignore Python files in root from being treated as serverless functions
+*.py
+!api/**/*.py
