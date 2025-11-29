@@ -144,6 +144,138 @@
             color: #ef4444;
         }
 
+        /* Notification Toast Styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 400px;
+        }
+
+        .notification-toast {
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            animation: slideInRight 0.3s ease-out;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 300px;
+        }
+
+        .notification-toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .notification-toast.info {
+            border-left: 4px solid var(--primary);
+        }
+
+        .notification-toast.warning {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-main);
+        }
+
+        .notification-message {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .notification-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: color 0.2s;
+        }
+
+        .notification-close:hover {
+            color: var(--text-main);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .notification-toast.removing {
+            animation: slideOutRight 0.3s ease-out forwards;
+        }
+
+        /* Badge for pending count */
+        .pending-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: var(--danger);
+            color: white;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
         .logout-btn {
             padding: 8px 16px;
             border-radius: 999px;
@@ -736,12 +868,12 @@
                             </div>
                             <div class="stat-card">
                                 <div class="stat-label">Total Used Salary</div>
-                                <div class="stat-value amount-negative" id="statTotalUsed">$0.00</div>
+                                <div class="stat-value amount-negative" id="statTotalUsed">KSH 0.00</div>
                                 <div class="stat-sub">Bills + Approved Advances</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-label">Total Remaining Salary</div>
-                                <div class="stat-value amount-positive" id="statTotalRemaining">$0.00</div>
+                                <div class="stat-value amount-positive" id="statTotalRemaining">KSH 0.00</div>
                                 <div class="stat-sub">After deductions</div>
                             </div>
                         </div>
@@ -767,9 +899,15 @@
                     <!-- Details tab with sub-tabs for advances, bills, and off days -->
                     <div id="detailsTab" class="tab-content">
                         <div class="sub-tabs" style="margin-bottom: 16px;">
-                            <button class="sub-tab active" data-sub-tab="advancesSubTab">Advances</button>
+                            <button class="sub-tab active" data-sub-tab="advancesSubTab">
+                                Advances
+                                <span id="advancesPendingBadge" class="pending-badge" style="display: none;">0</span>
+                            </button>
                             <button class="sub-tab" data-sub-tab="billsSubTab">Bills</button>
-                            <button class="sub-tab" data-sub-tab="offDaysSubTab">Off Days</button>
+                            <button class="sub-tab" data-sub-tab="offDaysSubTab">
+                                Off Days
+                                <span id="offDaysPendingBadge" class="pending-badge" style="display: none;">0</span>
+                            </button>
                         </div>
 
                         <!-- Advances sub-tab -->
@@ -933,6 +1071,9 @@
         </div>
     </div>
 
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
     <script>
         const API_BASE = window.location.origin.startsWith('http')
             ? window.location.origin
@@ -941,11 +1082,25 @@
         let salaryRows = [];
         let allEmployees = [];
         let allOffDays = [];
+        let allAdvances = [];
         let lastUpdatedOffDayId = null;
+        let lastUpdatedAdvanceId = null;
+        
+        // Track known request IDs for detecting new requests
+        let knownAdvanceIds = new Set();
+        let knownOffDayIds = new Set();
+        
+        // Polling interval (5 seconds)
+        let pollingInterval = null;
+        const POLL_INTERVAL_MS = 5000;
 
         function formatCurrency(value) {
             const num = Number(value) || 0;
-            return '$' + num.toFixed(2);
+            // Show negative sign for negative values
+            if (num < 0) {
+                return '-KSH ' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return 'KSH ' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function computeSalaryStats(rows) {
@@ -969,7 +1124,7 @@
                 const tr = document.createElement('tr');
                 const remaining = parseFloat(row.remaining_salary || 0);
                 const remainingClass = remaining < 0 ? 'amount-negative' : 'amount-positive';
-                const remainingDisplay = remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : formatCurrency(row.remaining_salary);
+                const remainingDisplay = formatCurrency(row.remaining_salary);
                 
                 tr.innerHTML = `
                     <td>${row.first_name} ${row.last_name}</td>
@@ -986,7 +1141,7 @@
             document.getElementById('statTotalUsed').textContent = formatCurrency(stats.totalUsed);
             const totalRemaining = stats.totalRemaining;
             const totalRemainingClass = totalRemaining < 0 ? 'amount-negative' : 'amount-positive';
-            const totalRemainingDisplay = totalRemaining < 0 ? `-$${Math.abs(totalRemaining).toFixed(2)}` : formatCurrency(totalRemaining);
+            const totalRemainingDisplay = formatCurrency(totalRemaining);
             const totalRemainingEl = document.getElementById('statTotalRemaining');
             totalRemainingEl.textContent = totalRemainingDisplay;
             totalRemainingEl.className = 'stat-value ' + totalRemainingClass;
@@ -1189,9 +1344,7 @@
                 });
         }
 
-        let allAdvances = [];
         let allBills = [];
-        let lastUpdatedAdvanceId = null;
 
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
@@ -1300,19 +1453,43 @@
             });
         }
 
-        async function loadAdvances() {
+        async function loadAdvances(showNotifications = true) {
             try {
                 const res = await fetch(`${API_BASE}/api/admin/advances`);
                 if (!res.ok) {
                     throw new Error(`Failed to load advances (${res.status})`);
                 }
                 const data = await res.json();
-                allAdvances = Array.isArray(data) ? data : [];
+                const newAdvances = Array.isArray(data) ? data : [];
+                
+                // Detect new pending advances
+                if (showNotifications && knownAdvanceIds.size > 0) {
+                    const newPendingAdvances = newAdvances.filter(adv => {
+                        return adv.status === 'pending' && !knownAdvanceIds.has(adv.id);
+                    });
+                    
+                    if (newPendingAdvances.length > 0) {
+                        newPendingAdvances.forEach(adv => {
+                            showNotification(
+                                'info',
+                                'New Advance Request',
+                                `${adv.employee_name} requested an advance of ${formatCurrency(adv.amount_for_advance)}`
+                            );
+                        });
+                    }
+                }
+                
+                // Update known IDs
+                newAdvances.forEach(adv => knownAdvanceIds.add(adv.id));
+                
+                allAdvances = newAdvances;
                 renderAdvancesTable();
+                updatePendingBadges();
             } catch (err) {
                 console.error('Error loading advances:', err);
                 allAdvances = [];
                 renderAdvancesTable();
+                updatePendingBadges();
             }
         }
 
@@ -1380,19 +1557,43 @@
             });
         }
 
-        async function loadOffDays() {
+        async function loadOffDays(showNotifications = true) {
             try {
                 const res = await fetch(`${API_BASE}/api/admin/off-days`);
                 if (!res.ok) {
                     throw new Error(`Failed to load off days (${res.status})`);
                 }
                 const data = await res.json();
-                allOffDays = Array.isArray(data) ? data : [];
+                const newOffDays = Array.isArray(data) ? data : [];
+                
+                // Detect new pending off days
+                if (showNotifications && knownOffDayIds.size > 0) {
+                    const newPendingOffDays = newOffDays.filter(offDay => {
+                        return offDay.status === 'pending' && !knownOffDayIds.has(offDay.id);
+                    });
+                    
+                    if (newPendingOffDays.length > 0) {
+                        newPendingOffDays.forEach(offDay => {
+                            showNotification(
+                                'info',
+                                'New Off Day Request',
+                                `${offDay.employee_name} requested ${offDay.day_count} day(s) off`
+                            );
+                        });
+                    }
+                }
+                
+                // Update known IDs
+                newOffDays.forEach(offDay => knownOffDayIds.add(offDay.id));
+                
+                allOffDays = newOffDays;
                 renderOffDaysTable();
+                updatePendingBadges();
             } catch (err) {
                 console.error('Error loading off days:', err);
                 allOffDays = [];
                 renderOffDaysTable();
+                updatePendingBadges();
             }
         }
 
@@ -1432,7 +1633,7 @@
                 
                 // Show appropriate message
                 if (wasAutoRejected) {
-                    alert(`⚠️ ADVANCE AUTO-REJECTED: ${updatedAdvance.approval_notes}\n\nThe advance could not be approved due to insufficient remaining salary.`);
+                    showNotification('warning', 'Advance Auto-Rejected', updatedAdvance.approval_notes || 'The advance could not be approved due to insufficient remaining salary.');
                 } else if (updatedAdvance.status === 'approved') {
                     alert('✅ Advance request approved successfully! Status and timestamp have been updated.');
                 } else {
@@ -1618,6 +1819,84 @@
             });
         }
 
+        // Notification system
+        function showNotification(type, title, message, duration = 5000) {
+            const container = document.getElementById('notificationContainer');
+            const toast = document.createElement('div');
+            toast.className = `notification-toast ${type}`;
+            
+            const icons = {
+                success: '✅',
+                info: '🔔',
+                warning: '⚠️'
+            };
+            
+            toast.innerHTML = `
+                <div class="notification-icon">${icons[type] || 'ℹ️'}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                </div>
+                <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto-remove after duration
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        // Update pending badges
+        function updatePendingBadges() {
+            const pendingAdvances = allAdvances.filter(adv => adv.status === 'pending').length;
+            const pendingOffDays = allOffDays.filter(offDay => offDay.status === 'pending').length;
+            
+            const advancesBadge = document.getElementById('advancesPendingBadge');
+            const offDaysBadge = document.getElementById('offDaysPendingBadge');
+            
+            if (advancesBadge) {
+                if (pendingAdvances > 0) {
+                    advancesBadge.textContent = pendingAdvances;
+                    advancesBadge.style.display = 'inline-flex';
+                } else {
+                    advancesBadge.style.display = 'none';
+                }
+            }
+            
+            if (offDaysBadge) {
+                if (pendingOffDays > 0) {
+                    offDaysBadge.textContent = pendingOffDays;
+                    offDaysBadge.style.display = 'inline-flex';
+                } else {
+                    offDaysBadge.style.display = 'none';
+                }
+            }
+        }
+        
+        // Start polling for updates
+        function startPolling() {
+            // Initial load without notifications
+            loadAdvances(false);
+            loadOffDays(false);
+            
+            // Set up polling interval
+            pollingInterval = setInterval(() => {
+                loadAdvances(true);  // Show notifications for new requests
+                loadOffDays(true);
+            }, POLL_INTERVAL_MS);
+        }
+        
+        // Stop polling
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             loadSalarySummary();
             loadEmployeesForVerification();
@@ -1625,6 +1904,23 @@
             document.getElementById('addUserForm').addEventListener('submit', handleAddUser);
             document.getElementById('verifyUserSelect').addEventListener('change', updateVerifyUserRole);
             document.getElementById('userVerificationForm').addEventListener('submit', handleUserVerification);
+            
+            // Start polling for real-time updates
+            startPolling();
+        });
+        
+        // Stop polling when page is hidden (tab switch, minimize, etc.)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                startPolling();
+            }
+        });
+        
+        // Stop polling when page is unloaded
+        window.addEventListener('beforeunload', () => {
+            stopPolling();
         });
     </script>
 </body>

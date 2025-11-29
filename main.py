@@ -75,7 +75,7 @@ def get_db() -> Session:
 def calculate_remaining_salary(employee_id: int, db: Session) -> float:
     """
     Calculate remaining salary for an employee.
-    Returns: remaining_salary = max(salary - used_salary, 0)
+    Returns: remaining_salary = salary - used_salary (can be negative)
     where used_salary = sum(bills) + sum(approved advances)
     """
     employee = db.query(Employee).get(employee_id)
@@ -101,7 +101,7 @@ def calculate_remaining_salary(employee_id: int, db: Session) -> float:
     
     used = float(bills_sum or 0) + float(advances_sum or 0)
     salary = float(employee.salary or 0)
-    remaining = max(salary - used, 0.0)
+    remaining = salary - used  # Allow negative values
     
     return remaining
 
@@ -570,7 +570,7 @@ def create_advance(payload: AdvanceCreate, db: Session = Depends(get_db)):
     if new_used > base_salary:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot request advance: This would make total used salary ${new_used:.2f}, which exceeds base salary of ${base_salary:.2f}. Maximum allowed: ${remaining_salary:.2f}. Advance request automatically rejected."
+            detail=f"Cannot request advance: This would make total used salary KSH {new_used:,.2f}, which exceeds base salary of KSH {base_salary:,.2f}. Maximum allowed: KSH {remaining_salary:,.2f}. Advance request automatically rejected."
         )
     
     if remaining_salary <= 0:
@@ -582,7 +582,7 @@ def create_advance(payload: AdvanceCreate, db: Session = Depends(get_db)):
     if payload.amount > remaining_salary:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot request advance: Amount ${payload.amount:.2f} exceeds your remaining salary of ${remaining_salary:.2f}. Advance request automatically rejected."
+            detail=f"Cannot request advance: Amount KSH {payload.amount:,.2f} exceeds your remaining salary of KSH {remaining_salary:,.2f}. Advance request automatically rejected."
         )
 
     advance = Advance(
@@ -645,7 +645,7 @@ def approve_advance(advance_id: int, payload: AdvanceApprovalRequest, db: Sessio
         if new_used > base_salary:
             advance.status = AdvanceStatus.DENIED
             advance.approved_at = datetime.utcnow()
-            auto_reject_msg = f" [AUTO-REJECTED: Would make total used salary ${new_used:.2f}, exceeding base salary ${base_salary:.2f}. Remaining would be negative: ${new_remaining:.2f}]"
+            auto_reject_msg = f" [AUTO-REJECTED: Would make total used salary KSH {new_used:,.2f}, exceeding base salary KSH {base_salary:,.2f}. Remaining would be negative: KSH {new_remaining:,.2f}]"
             advance.approval_notes = (payload.notes + auto_reject_msg) if payload.notes else auto_reject_msg.strip()
             db.commit()
             db.refresh(advance)
@@ -653,7 +653,7 @@ def approve_advance(advance_id: int, payload: AdvanceApprovalRequest, db: Sessio
         elif new_remaining < 0:
             advance.status = AdvanceStatus.DENIED
             advance.approved_at = datetime.utcnow()
-            auto_reject_msg = f" [AUTO-REJECTED: No remaining salary. Would become negative: ${new_remaining:.2f}. Current remaining: ${remaining_salary:.2f}]"
+            auto_reject_msg = f" [AUTO-REJECTED: No remaining salary. Would become negative: KSH {new_remaining:,.2f}. Current remaining: KSH {remaining_salary:,.2f}]"
             advance.approval_notes = (payload.notes + auto_reject_msg) if payload.notes else auto_reject_msg.strip()
             db.commit()
             db.refresh(advance)
@@ -661,7 +661,7 @@ def approve_advance(advance_id: int, payload: AdvanceApprovalRequest, db: Sessio
         elif remaining_salary <= 0:
             advance.status = AdvanceStatus.DENIED
             advance.approved_at = datetime.utcnow()
-            auto_reject_msg = f" [AUTO-REJECTED: No remaining salary available. Current remaining: ${remaining_salary:.2f}]"
+            auto_reject_msg = f" [AUTO-REJECTED: No remaining salary available. Current remaining: KSH {remaining_salary:,.2f}]"
             advance.approval_notes = (payload.notes + auto_reject_msg) if payload.notes else auto_reject_msg.strip()
             db.commit()
             db.refresh(advance)
@@ -669,7 +669,7 @@ def approve_advance(advance_id: int, payload: AdvanceApprovalRequest, db: Sessio
         elif advance.amount_for_advance > remaining_salary:
             advance.status = AdvanceStatus.DENIED
             advance.approved_at = datetime.utcnow()
-            auto_reject_msg = f" [AUTO-REJECTED: Amount ${advance.amount_for_advance:.2f} exceeds remaining salary ${remaining_salary:.2f}]"
+            auto_reject_msg = f" [AUTO-REJECTED: Amount KSH {advance.amount_for_advance:,.2f} exceeds remaining salary KSH {remaining_salary:,.2f}]"
             advance.approval_notes = (payload.notes + auto_reject_msg) if payload.notes else auto_reject_msg.strip()
             db.commit()
             db.refresh(advance)
@@ -736,7 +736,7 @@ def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
     if role_value == 'manager' and manager.id == employee.id:
         raise HTTPException(status_code=400, detail="Managers cannot create bills for themselves.")
 
-    # Check remaining salary before adding bill
+    # Check remaining salary before adding bill (for warning purposes)
     remaining_salary = calculate_remaining_salary(employee.id, db)
     base_salary = float(employee.salary or 0)
     
@@ -756,25 +756,9 @@ def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
     )
     current_used = float(bills_sum or 0) + float(advances_sum or 0)
     new_used = current_used + payload.amount
+    new_remaining = base_salary - new_used
     
-    # Ensure used salary never exceeds base salary
-    if new_used > base_salary:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot add bill: This would make total used salary ${new_used:.2f}, which exceeds base salary of ${base_salary:.2f} for {employee.first_name} {employee.last_name}. Maximum allowed: ${remaining_salary:.2f}."
-        )
-    
-    if remaining_salary <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot add bill: Employee {employee.first_name} {employee.last_name} has no remaining salary (${remaining_salary:.2f}). They have already used all their base salary."
-        )
-    
-    if payload.amount > remaining_salary:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot add bill: Amount ${payload.amount:.2f} exceeds remaining salary of ${remaining_salary:.2f} for {employee.first_name} {employee.last_name}."
-        )
+    # Allow bills even if they exceed salary, but we'll return a warning in the response
 
     bill_datetime = (
         payload.date if isinstance(payload.date, datetime) else datetime.combine(payload.date, datetime.min.time())
@@ -792,7 +776,13 @@ def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
     db.add(bill)
     db.commit()
     db.refresh(bill)
-    return {"id": bill.id}
+    
+    # Prepare response with warning if salary is exceeded
+    response = {"id": bill.id}
+    if new_remaining < 0:
+        response["warning"] = f"⚠️ WARNING: {employee.first_name} {employee.last_name} has exceeded their salary. Remaining salary: KSH {new_remaining:,.2f} (negative). Total used: KSH {new_used:,.2f} out of base salary: KSH {base_salary:,.2f}."
+    
+    return response
 
 
 @app.post("/api/off-days", status_code=status.HTTP_201_CREATED, tags=["off_days"])
