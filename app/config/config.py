@@ -15,10 +15,10 @@ load_dotenv(find_dotenv())
 # Neon Database connection string
 # Expected format (from your Neon dashboard):
 #   postgresql://<user>:<password>@<host>/<database>?sslmode=require
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://username:password@hostname/database?sslmode=require",
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@hostname/database?sslmode=require")
+
+# Validate DATABASE_URL (will be checked at runtime in main.py if needed)
+# We don't raise here to allow the app to start and show a proper error message
 
 # Email configuration for notifications (Gmail)
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")

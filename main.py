@@ -3,10 +3,14 @@ from typing import List, Optional, Literal
 from pathlib import Path
 import os
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session, sessionmaker, aliased
@@ -242,19 +246,52 @@ app = FastAPI(
     description="Backend API for the Salary Management System (Neon + FastAPI).",
 )
 
-# Allow local dev front‑ends; tighten origins as needed.
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS Configuration - Restrict to specific origins in production
+# Get allowed origins from environment variable, default to empty list for production
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+# In development, allow localhost; in production, use specific domains
+if not ALLOWED_ORIGINS or (len(ALLOWED_ORIGINS) == 1 and not ALLOWED_ORIGINS[0]):
+    # Development mode - allow common localhost ports
+    ALLOWED_ORIGINS = [
+        "http://localhost:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    expose_headers=["Content-Type"],
 )
 
 # Mount static files (images, videos, CSS, JS)
 # Use absolute path for Vercel compatibility
 # Get project root directory
-PROJECT_ROOT = Path(__file__).parent.parent
+# main.py is in the root, so parent is the project root
+PROJECT_ROOT = Path(__file__).parent
 static_dir = PROJECT_ROOT / "static"
 templates_dir = PROJECT_ROOT / "templates"
 
@@ -357,7 +394,8 @@ def list_employees(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/login", response_model=LoginResponse, tags=["auth"])
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Rate limit: 5 login attempts per minute
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     """
     Login endpoint that validates PIN and returns employee info with role-based routing.
     Accepts either:
@@ -407,13 +445,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     
     # PIN-based login for regular users
     if not first_name or pin is None:
-        raise HTTPException(status_code=400, detail="Please provide first_name and PIN.")
+        raise HTTPException(status_code=400, detail="Invalid credentials provided.")
     
     # Convert PIN to int if it's a string
     try:
         pin_int = int(pin) if isinstance(pin, str) else pin
     except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid PIN format.")
+        raise HTTPException(status_code=400, detail="Invalid credentials provided.")
     
     # Find UserAuth by first_name and PIN
     auth = db.query(UserAuth).filter(
@@ -422,7 +460,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     ).first()
     
     if not auth:
-        raise HTTPException(status_code=401, detail="Invalid first name or PIN.")
+        raise HTTPException(status_code=401, detail="Invalid credentials. Please check your login information.")
     
     # Find the employee by first_name (matching the one used in UserAuth)
     # Note: If multiple employees share the same first_name, we get the first match
