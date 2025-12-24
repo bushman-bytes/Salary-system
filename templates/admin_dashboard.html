@@ -908,6 +908,7 @@
                                 Off Days
                                 <span id="offDaysPendingBadge" class="pending-badge" style="display: none;">0</span>
                             </button>
+                            <button class="sub-tab" data-sub-tab="salaryPaymentsSubTab">Salary Payments</button>
                         </div>
 
                         <!-- Advances sub-tab -->
@@ -963,6 +964,27 @@
                                             <th>Days Worked (Month)</th>
                                             <th>Total Days</th>
                                             <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Filled by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Salary Payments sub-tab -->
+                        <div id="salaryPaymentsSubTab" class="sub-tab-content">
+                            <div class="table-wrapper scrollable">
+                                <table id="salaryPaymentsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Base Salary</th>
+                                            <th>Used Salary</th>
+                                            <th>Remaining Salary</th>
+                                            <th>Payment Date</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -1075,6 +1097,30 @@
     <div id="notificationContainer" class="notification-container"></div>
 
     <script>
+        // ========================================
+        // AUTHENTICATION CHECK - Must be first!
+        // ========================================
+        (function() {
+            // Check if user is logged in
+            const loggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('rememberMe') === 'true';
+            const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            const requiredRole = 'admin';
+            
+            if (!loggedIn || !userRole) {
+                // Not logged in - redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Check if user has the required role for this dashboard
+            if (userRole.toLowerCase() !== requiredRole.toLowerCase()) {
+                // Wrong role - redirect to login with error message
+                sessionStorage.setItem('authError', `Access denied. This dashboard requires ${requiredRole} role, but you are logged in as ${userRole}.`);
+                window.location.href = '/login';
+                return;
+            }
+        })();
+        
         const API_BASE = window.location.origin.startsWith('http')
             ? window.location.origin
             : 'http://localhost:8000';
@@ -1160,6 +1206,134 @@
                 console.error('Error loading salary summary:', err);
                 salaryRows = [];
                 renderSalaryTable();
+            }
+        }
+
+        async function loadSalaryPayments() {
+            try {
+                // Load employees if not already loaded (needed for admin ID)
+                if (!allEmployees || allEmployees.length === 0) {
+                    await loadEmployeesForVerification();
+                }
+                // Reuse salary summary data for the payments table
+                if (!salaryRows || salaryRows.length === 0) {
+                    await loadSalarySummary();
+                }
+                renderSalaryPaymentsTable();
+            } catch (err) {
+                console.error('Error loading salary payments:', err);
+                renderSalaryPaymentsTable();
+            }
+        }
+
+        function renderSalaryPaymentsTable() {
+            const tbody = document.querySelector('#salaryPaymentsTable tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            if (!salaryRows || salaryRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">No employees found</td></tr>';
+                return;
+            }
+            
+            salaryRows.forEach(row => {
+                const tr = document.createElement('tr');
+                const remaining = parseFloat(row.remaining_salary || 0);
+                const remainingClass = remaining < 0 ? 'amount-negative' : 'amount-positive';
+                const remainingDisplay = formatCurrency(row.remaining_salary);
+                
+                // Get current logged-in admin ID from session storage
+                let adminId = null;
+                const loggedInEmployeeIdStr = sessionStorage.getItem('employeeId') || localStorage.getItem('employeeId');
+                if (loggedInEmployeeIdStr) {
+                    const loggedInEmployeeId = parseInt(loggedInEmployeeIdStr, 10);
+                    if (!isNaN(loggedInEmployeeId)) {
+                        const loggedInUser = allEmployees.find(e => e.id === loggedInEmployeeId);
+                        if (loggedInUser && loggedInUser.role && loggedInUser.role.toLowerCase() === 'admin') {
+                            adminId = loggedInUser.id;
+                        }
+                    }
+                }
+                
+                // Fallback: Find any admin from employees list if current user not found or not admin
+                if (!adminId) {
+                    const admin = allEmployees.find(e => e.role && e.role.toLowerCase() === 'admin');
+                    adminId = admin ? admin.id : null;
+                }
+                
+                if (!adminId) {
+                    console.error('No admin found to record salary payment. Current user must be an admin.');
+                }
+                
+                // Escape single quotes in names for onclick handler
+                const safeFirstName = (row.first_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const safeLastName = (row.last_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const employeeFullName = `${safeFirstName} ${safeLastName}`;
+                
+                const isDisabled = !adminId || remaining <= 0;
+                const disabledAttr = isDisabled ? 'disabled style="opacity: 0.5;"' : '';
+                const titleAttr = !adminId ? 'title="Admin ID not found. Please log in as an admin."' : '';
+                const onclickAttr = !isDisabled ? `onclick="paySalary(${row.employee_id}, ${adminId}, '${employeeFullName}')"` : '';
+                
+                tr.innerHTML = `
+                    <td>${row.first_name} ${row.last_name}</td>
+                    <td>${formatCurrency(row.salary)}</td>
+                    <td class="amount-negative">${formatCurrency(row.used_salary)}</td>
+                    <td class="${remainingClass}">${remainingDisplay}</td>
+                    <td>-</td>
+                    <td>
+                        <button class="btn btn-success" ${disabledAttr} ${titleAttr} ${onclickAttr}>
+                            Pay Salary
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function paySalary(employeeId, adminId, employeeName) {
+            // Validate adminId is a valid number
+            const adminIdNum = parseInt(adminId, 10);
+            if (!adminId || isNaN(adminIdNum) || adminIdNum <= 0) {
+                showNotification('error', 'Permission Error', 'Admin ID not found. Please log in as an admin to record salary payments.');
+                console.error('Invalid adminId:', adminId);
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to pay salary for ${employeeName}? This will reset their used salary to 0.`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/salary-payments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        employee_id: parseInt(employeeId, 10),
+                        admin_id: adminIdNum, // Use parsed admin ID
+                        amount_paid: null, // Will pay remaining salary automatically
+                        payment_date: null, // Will use today
+                        notes: null
+                    })
+                });
+                
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || `Failed to pay salary (${res.status})`);
+                }
+                
+                const payment = await res.json();
+                showNotification('success', 'Salary Paid', `Salary payment recorded for ${employeeName}. Amount: ${formatCurrency(payment.amount_paid)}`);
+                
+                // Reload salary summary and payments table
+                await loadSalarySummary();
+                await loadSalaryPayments();
+            } catch (err) {
+                console.error('Error paying salary:', err);
+                showNotification('error', 'Payment Failed', err.message || 'Failed to record salary payment');
             }
         }
 
@@ -1813,6 +1987,8 @@
                             loadBills();
                         } else if (targetId === 'offDaysSubTab') {
                             loadOffDays();
+                        } else if (targetId === 'salaryPaymentsSubTab') {
+                            loadSalaryPayments();
                         }
                     }
                 });

@@ -11,7 +11,7 @@ from app.config.config import (
     EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM,
     WHATSAPP_ACCOUNT_SID, WHATSAPP_AUTH_TOKEN, WHATSAPP_FROM_NUMBER
 )
-from app.models.schema import BillAdvance, Employee
+from app.models.schema import Advance, Employee
 from sqlalchemy.orm import Session
 
 
@@ -118,14 +118,14 @@ def send_pending_advances_summary(session: Session, admin_id: int) -> bool:
     for advance in pending_advances:
         employee = advance.employee
         summary_lines.append(
-            f"- ID: {advance.id} | PIN: {advance.pin} | "
+            f"- ID: {advance.id} | "
             f"Employee: {employee.first_name} {employee.last_name} | "
-            f"Amount: ${advance.amount:.2f} | "
-            f"Date: {advance.date.strftime('%Y-%m-%d')}"
+            f"Amount: ${advance.amount_for_advance:.2f} | "
+            f"Date: {advance.created_at.strftime('%Y-%m-%d')}"
         )
         if advance.reason:
             summary_lines.append(f"  Reason: {advance.reason}")
-        total_amount += advance.amount
+        total_amount += advance.amount_for_advance
     
     summary_lines.append("")
     summary_lines.append(f"Total Amount: ${total_amount:.2f}")
@@ -162,7 +162,7 @@ def send_advance_decision_notification(
     Returns:
         True if notification sent successfully
     """
-    advance = session.query(BillAdvance).filter(BillAdvance.id == advance_id).first()
+    advance = session.query(Advance).filter(Advance.id == advance_id).first()
     if not advance or not advance.employee:
         return False
     
@@ -170,7 +170,7 @@ def send_advance_decision_notification(
     status = "APPROVED" if approved else "DENIED"
     
     message = (
-        f"Your advance request (PIN: {advance.pin}, Amount: ${advance.amount:.2f}) "
+        f"Your advance request (ID: {advance.id}, Amount: ${advance.amount_for_advance:.2f}) "
         f"has been {status}."
     )
     

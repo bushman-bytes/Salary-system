@@ -32,3 +32,11 @@ WHATSAPP_ACCOUNT_SID = os.getenv("WHATSAPP_ACCOUNT_SID", "")
 WHATSAPP_AUTH_TOKEN = os.getenv("WHATSAPP_AUTH_TOKEN", "")
 WHATSAPP_FROM_NUMBER = os.getenv("WHATSAPP_FROM_NUMBER", "")
 
+# AI Agent Configuration (Phase 2)
+# Note: Detailed AI agent configuration is in app.ai_agent.config
+# These are basic environment variable references for main config
+AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
+VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "./vector_store")
+

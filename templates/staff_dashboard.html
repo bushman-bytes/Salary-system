@@ -488,6 +488,30 @@
             el.style.display = 'block';
         }
 
+        // ========================================
+        // AUTHENTICATION CHECK - Must be first!
+        // ========================================
+        (function() {
+            // Check if user is logged in
+            const loggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('rememberMe') === 'true';
+            const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            const requiredRole = 'staff';
+            
+            if (!loggedIn || !userRole) {
+                // Not logged in - redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Check if user has the required role for this dashboard
+            if (userRole.toLowerCase() !== requiredRole.toLowerCase()) {
+                // Wrong role - redirect to login with error message
+                sessionStorage.setItem('authError', `Access denied. This dashboard requires ${requiredRole} role, but you are logged in as ${userRole}.`);
+                window.location.href = '/login';
+                return;
+            }
+        })();
+        
         const API_BASE = window.location.origin.startsWith('http')
             ? window.location.origin
             : 'http://localhost:8000';
