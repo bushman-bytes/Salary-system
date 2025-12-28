@@ -119,7 +119,7 @@ def calculate_remaining_salary(employee_id: int, db: Session) -> float:
 class EmployeeBase(BaseModel):
     first_name: str = Field(..., max_length=100)
     last_name: str = Field(..., max_length=100)
-    role: Literal["staff", "manager"]
+    role: Literal["staff", "manager", "admin"]
     salary: float = Field(..., gt=0)
     phone_no: str = Field(..., max_length=20)
     employment_start_date: Optional[date] = None
@@ -142,6 +142,8 @@ class EmployeeOut(EmployeeBase):
         """Convert Role enum to string value before validation."""
         if isinstance(v, Role):
             return v.value
+        if isinstance(v, str):
+            return v.lower()
         return v
 
 
@@ -438,8 +440,39 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/employees", response_model=List[EmployeeOut], tags=["employees"])
 def list_employees(db: Session = Depends(get_db)):
-    qs = db.query(Employee).order_by(Employee.first_name, Employee.last_name).all()
-    return qs
+    try:
+        qs = db.query(Employee).order_by(Employee.first_name, Employee.last_name).all()
+        
+        # Manually convert to EmployeeOut instances to ensure role is properly serialized
+        result = []
+        for emp in qs:
+            # Convert role enum to string
+            role_value = emp.role.value if hasattr(emp.role, 'value') else str(emp.role)
+            
+            # Create EmployeeOut instance with converted role
+            employee_out = EmployeeOut(
+                id=emp.id,
+                first_name=emp.first_name,
+                last_name=emp.last_name,
+                role=role_value,  # Already converted to string
+                salary=float(emp.salary),
+                phone_no=emp.phone_no,
+                employment_start_date=emp.employment_start_date,
+                days_worked_this_month=emp.days_worked_this_month,
+                total_days_worked=emp.total_days_worked,
+            )
+            result.append(employee_out)
+        
+        return result
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in list_employees: {str(e)}")
+        print(f"Traceback: {error_details}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error loading employees: {str(e)}"
+        )
 
 
 # ---------------------------------------------------------------------------

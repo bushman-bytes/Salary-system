@@ -1564,10 +1564,15 @@
 
         async function loadEmployeesForVerification() {
             try {
+                console.log('Loading employees from:', `${API_BASE}/api/employees`);
                 const res = await fetch(`${API_BASE}/api/employees`);
+                
                 if (!res.ok) {
-                    throw new Error(`Failed to load employees (${res.status})`);
+                    const errorText = await res.text();
+                    console.error('API Error Response:', errorText);
+                    throw new Error(`Failed to load employees (${res.status}): ${errorText}`);
                 }
+                
                 const data = await res.json();
                 allEmployees = Array.isArray(data) ? data : [];
 
@@ -1600,7 +1605,7 @@
                     // Ensure we have the required fields
                     const firstName = emp.first_name || 'Unknown';
                     const lastName = emp.last_name || '';
-                    const role = roleValue || 'unknown';
+                    const role = String(roleValue || 'unknown').toLowerCase();
                     
                     const opt = document.createElement('option');
                     opt.value = emp.id;
@@ -1611,7 +1616,15 @@
                 console.error('Error loading employees for verification:', err);
                 const select = document.getElementById('verifyUserSelect');
                 if (select) {
-                    select.innerHTML = '<option value=\"\">Error loading employees</option>';
+                    const errorMsg = err.message || 'Error loading employees';
+                    select.innerHTML = `<option value=\"\">${errorMsg}</option>`;
+                    // Show error message to user
+                    const messageEl = document.getElementById('userVerificationMessage');
+                    if (messageEl) {
+                        messageEl.textContent = `Failed to load employees: ${errorMsg}`;
+                        messageEl.className = 'inline-message error';
+                        messageEl.style.display = 'block';
+                    }
                 }
             }
         }
