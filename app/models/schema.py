@@ -48,6 +48,9 @@ class Employee(Base):
     # Computed fields: days worked in current month and total days worked
     days_worked_this_month = Column(Integer, nullable=True, default=0)
     total_days_worked = Column(Integer, nullable=True, default=0)
+    # Monthly used salary: tracks amount used this month (bills + advances)
+    # Can exceed salary (negative remaining) - negative balance carries forward to next month
+    used_salary = Column(Float, nullable=True, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -56,6 +59,7 @@ class Employee(Base):
     bills_received = relationship("Bill", foreign_keys="Bill.billed_employee_id", back_populates="billed_employee")
     bills_recorded = relationship("Bill", foreign_keys="Bill.recorded_by_id", back_populates="recorded_by")
     off_days = relationship("OffDay", back_populates="employee")
+    salary_payments = relationship("SalaryPayment", foreign_keys="SalaryPayment.employee_id", back_populates="employee")
     
     def __repr__(self):
         return f"<Employee(id={self.id}, name={self.first_name} {self.last_name}, role={self.role.value})>"
@@ -158,6 +162,34 @@ class OffDay(Base):
 
     def __repr__(self):
         return f"<OffDay(id={self.id}, employee_id={self.employee_id}, date={self.date}, day_count={self.day_count}, status={self.status.value})>"
+
+
+class SalaryPayment(Base):
+    """Salary payment records - tracks when salaries are paid to employees"""
+    __tablename__ = 'salary_payment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, ForeignKey('employee.id'), nullable=False)
+    
+    # Payment details
+    amount_paid = Column(Float, nullable=False)  # Amount paid (usually remaining salary or full salary)
+    payment_date = Column(Date, nullable=False, default=date.today)
+    
+    # Optional notes about the payment
+    notes = Column(Text, nullable=True)
+    
+    # Who recorded this payment (admin)
+    paid_by_id = Column(Integer, ForeignKey('employee.id'), nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="salary_payments")
+    paid_by = relationship("Employee", foreign_keys=[paid_by_id])
+    
+    def __repr__(self):
+        return f"<SalaryPayment(id={self.id}, employee_id={self.employee_id}, amount_paid={self.amount_paid}, payment_date={self.payment_date})>"
 
 
 def create_tables(engine):

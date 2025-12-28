@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>AI Agent Dashboard - Salary Management System</title>
+    <link rel="icon" type="image/jpeg" href="/static/images/logo.jpg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-1: #020617;
+            --bg-2: #020617;
+            --bg-3: #0b1120;
+            --card-bg: rgba(15, 23, 42, 0.95);
+            --border-subtle: rgba(148, 163, 184, 0.2);
+            --primary: #6366f1;
+            --primary-soft: rgba(99, 102, 241, 0.2);
+            --accent: #06b6d4;
+            --danger: #ef4444;
+            --text-main: #e5e7eb;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(circle at top left, #1d2435 0, #020617 55%, #000 100%);
+            color: var(--text-main);
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .tab-button:hover {
+            background: var(--primary-soft);
+            border-color: var(--primary);
+        }
+
+        .tab-button.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(18px);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-soft);
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* Mobile-first responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .header p {
+                font-size: 0.95rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .tab-button {
+                width: 100%;
+                padding: 14px 20px;
+                font-size: 0.95rem;
+                min-height: 44px; /* Better touch target */
+            }
+
+            .card {
+                padding: 18px;
+                border-radius: 12px;
+            }
+
+            .card h2 {
+                font-size: 1.3rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 14px;
+                min-height: 44px;
+            }
+
+            .btn {
+                width: 100%;
+                padding: 14px 24px;
+                min-height: 48px;
+                justify-content: center;
+            }
+
+            .result-container {
+                padding: 16px;
+            }
+
+            .result-content pre {
+                font-size: 0.85rem;
+                padding: 12px;
+                overflow-x: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+                margin-bottom: 6px;
+            }
+
+            .header p {
+                font-size: 0.85rem;
+            }
+
+            .tabs {
+                gap: 6px;
+            }
+
+            .tab-button {
+                padding: 12px 16px;
+                font-size: 0.9rem;
+            }
+
+            .card {
+                padding: 14px;
+                margin-bottom: 16px;
+            }
+
+            .card h2 {
+                font-size: 1.1rem;
+                margin-bottom: 12px;
+            }
+
+            .info-box {
+                padding: 12px;
+            }
+
+            .info-box h4 {
+                font-size: 0.95rem;
+            }
+
+            .info-box p {
+                font-size: 0.85rem;
+            }
+
+            .form-group {
+                margin-bottom: 16px;
+            }
+
+            .form-group label {
+                font-size: 0.9rem;
+                margin-bottom: 6px;
+            }
+
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                font-size: 16px;
+                padding: 12px;
+            }
+
+            .form-group textarea {
+                min-height: 100px;
+            }
+
+            .btn {
+                padding: 12px 20px;
+                font-size: 0.95rem;
+            }
+
+            .examples ul {
+                margin-top: 8px;
+            }
+
+            .examples li {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+
+            .result-container {
+                padding: 12px;
+            }
+
+            .result-header h3 {
+                font-size: 1rem;
+            }
+
+            .result-content {
+                font-size: 0.9rem;
+            }
+
+            .result-content pre {
+                font-size: 0.8rem;
+                padding: 10px;
+            }
+
+            .metadata {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .tab-button,
+            .btn {
+                min-height: 44px;
+            }
+
+            .examples li {
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-3);
+            border-color: var(--primary);
+        }
+
+        .result-container {
+            margin-top: 24px;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            display: none;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-container.success {
+            border-color: var(--success);
+        }
+
+        .result-container.error {
+            border-color: var(--danger);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .result-header h3 {
+            font-size: 1.2rem;
+            color: var(--primary);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-badge.success {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+        }
+
+        .status-badge.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .result-content {
+            color: var(--text-main);
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .result-content pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+
+        .metadata {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .metadata-item {
+            margin-bottom: 8px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h4 {
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .examples {
+            margin-top: 12px;
+        }
+
+        .examples ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .examples li {
+            padding: 8px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .examples li:hover {
+            background: rgba(15, 23, 42, 0.8);
+            transform: translateX(4px);
+        }
+
+        .examples li::before {
+            content: "💡 ";
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Agent Dashboard</h1>
+            <p>Test and explore AI-powered features for the Salary Management System</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('summarize')">📊 Summarize</button>
+            <button class="tab-button" onclick="switchTab('report')">📈 Report</button>
+            <button class="tab-button" onclick="switchTab('query')">💬 Natural Language Query</button>
+        </div>
+
+        <!-- Summarize Tab -->
+        <div id="summarize" class="tab-content active">
+            <div class="card">
+                <h2>Generate AI Summary</h2>
+                <div class="info-box">
+                    <h4>About Summaries</h4>
+                    <p>Generate AI-powered summaries for employees, departments, time periods, or transaction statuses.</p>
+                </div>
+                <form id="summarizeForm">
+                    <div class="form-group">
+                        <label for="summarizeType">Query Type *</label>
+                        <select id="summarizeType" required>
+                            <option value="employee">Employee Summary</option>
+                            <option value="department">Department Summary</option>
+                            <option value="time_period">Time Period Summary</option>
+                            <option value="status">Status Summary</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employeeId">Employee ID</label>
+                            <input type="number" id="employeeId" placeholder="e.g., 1">
+                        </div>
+                        <div class="form-group">
+                            <label for="employeeName">Employee Name</label>
+                            <input type="text" id="employeeName" placeholder="e.g., John Doe">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="dateStart">Start Date</label>
+                            <input type="date" id="dateStart">
+                        </div>
+                        <div class="form-group">
+                            <label for="dateEnd">End Date</label>
+                            <input type="date" id="dateEnd">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="summarizeBtn">
+                        Generate Summary
+                    </button>
+                </form>
+                <div id="summarizeResult" class="result-container"></div>
+            </div>
+        </div>
+
+        <!-- Report Tab -->
+        <div id="report" class="tab-content">
+            <div class="card">
+                <h2>Generate AI Report</h2>
+                <div class="info-box">
+                    <h4>About Reports</h4>
+                    <p>Generate comprehensive AI-powered reports with financial analysis, operational metrics, or analytical insights.</p>
+                </div>
+                <form id="reportForm">
+                    <div class="form-group">
+                        <label for="reportType">Report Type *</label>
+                        <select id="reportType" required>
+                            <option value="financial">Financial Report</option>
+                            <option value="operational">Operational Report</option>
+                            <option value="analytical">Analytical Report</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reportDateStart">Start Date</label>
+                            <input type="date" id="reportDateStart">
+                        </div>
+                        <div class="form-group">
+                            <label for="reportDateEnd">End Date</label>
+                            <input type="date" id="reportDateEnd">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reportEmployeeId">Employee ID (Optional Filter)</label>
+                        <input type="number" id="reportEmployeeId" placeholder="Leave empty for all employees">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="includeCharts" style="width: auto; margin-right: 8px;">
+                            Include Chart Data
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="reportBtn">
+                        Generate Report
+                    </button>
+                </form>
+                <div id="reportResult" class="result-container"></div>
+            </div>
+        </div>
+
+        <!-- Query Tab -->
+        <div id="query" class="tab-content">
+            <div class="card">
+                <h2>Natural Language Query</h2>
+                <div class="info-box">
+                    <h4>Ask Questions in Plain English</h4>
+                    <p>Ask questions about your salary management data and get AI-powered responses.</p>
+                    <div class="examples">
+                        <strong>Example queries:</strong>
+                        <ul>
+                            <li onclick="fillQuery('What is the total amount of pending advances?')">What is the total amount of pending advances?</li>
+                            <li onclick="fillQuery('Show me a summary for employee John Doe')">Show me a summary for employee John Doe</li>
+                            <li onclick="fillQuery('Generate a financial report for last month')">Generate a financial report for last month</li>
+                            <li onclick="fillQuery('What are the trends in advance requests?')">What are the trends in advance requests?</li>
+                            <li onclick="fillQuery('Which employees have exceeded their salary?')">Which employees have exceeded their salary?</li>
+                        </ul>
+                    </div>
+                </div>
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="queryText">Your Question *</label>
+                        <textarea id="queryText" placeholder="Enter your question here..." required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contextEmployeeId">Context: Employee ID</label>
+                            <input type="number" id="contextEmployeeId" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label for="contextEmployeeName">Context: Employee Name</label>
+                            <input type="text" id="contextEmployeeName" placeholder="Optional">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="queryBtn">
+                        Ask Question
+                    </button>
+                </form>
+                <div id="queryResult" class="result-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // AUTHENTICATION CHECK - Must be first!
+        // ========================================
+        (function() {
+            // Check if user is logged in
+            const loggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('rememberMe') === 'true';
+            const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            
+            if (!loggedIn || !userRole) {
+                // Not logged in - redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Agent dashboard is accessible to admins (and potentially managers/staff)
+            // For now, allow all authenticated users, but you can restrict this if needed
+            // For example, only admins:
+            // if (userRole.toLowerCase() !== 'admin') {
+            //     sessionStorage.setItem('authError', 'Access denied. This dashboard requires admin role.');
+            //     window.location.href = '/login';
+            //     return;
+            // }
+        })();
+        
+        const API_BASE = window.location.origin;
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function fillQuery(text) {
+            document.getElementById('queryText').value = text;
+        }
+
+        function showResult(containerId, data, isError = false) {
+            const container = document.getElementById(containerId);
+            container.classList.add('show');
+            container.classList.remove('success', 'error');
+            container.classList.add(isError ? 'error' : 'success');
+
+            const header = container.querySelector('.result-header') || document.createElement('div');
+            header.className = 'result-header';
+            header.innerHTML = `
+                <h3>${isError ? 'Error' : 'Result'}</h3>
+                <span class="status-badge ${isError ? 'error' : 'success'}">
+                    ${isError ? 'Failed' : 'Success'}
+                </span>
+            `;
+
+            const content = container.querySelector('.result-content') || document.createElement('div');
+            content.className = 'result-content';
+            
+            if (isError) {
+                content.textContent = data.error || 'An error occurred';
+            } else {
+                if (typeof data.result === 'object') {
+                    content.innerHTML = `<pre>${JSON.stringify(data.result, null, 2)}</pre>`;
+                } else {
+                    content.textContent = data.result || 'No result returned';
+                }
+            }
+
+            const metadata = container.querySelector('.metadata') || document.createElement('div');
+            if (data.metadata && Object.keys(data.metadata).length > 0) {
+                metadata.className = 'metadata';
+                metadata.innerHTML = '<strong>Metadata:</strong><br>' +
+                    Object.entries(data.metadata).map(([key, value]) => 
+                        `<div class="metadata-item"><strong>${key}:</strong> ${JSON.stringify(value)}</div>`
+                    ).join('');
+            } else {
+                metadata.innerHTML = '';
+            }
+
+            container.innerHTML = '';
+            container.appendChild(header);
+            container.appendChild(content);
+            if (metadata.innerHTML) {
+                container.appendChild(metadata);
+            }
+        }
+
+        function setLoading(buttonId, isLoading) {
+            const btn = document.getElementById(buttonId);
+            if (isLoading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> Processing...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = btn.getAttribute('data-original-text') || 'Submit';
+            }
+        }
+
+        // Summarize Form
+        document.getElementById('summarizeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('summarizeBtn');
+            btn.setAttribute('data-original-text', btn.textContent);
+            setLoading('summarizeBtn', true);
+
+            const payload = {
+                query_type: document.getElementById('summarizeType').value,
+            };
+
+            const employeeId = document.getElementById('employeeId').value;
+            const employeeName = document.getElementById('employeeName').value;
+            const dateStart = document.getElementById('dateStart').value;
+            const dateEnd = document.getElementById('dateEnd').value;
+
+            if (employeeId) payload.employee_id = parseInt(employeeId);
+            if (employeeName) payload.employee_name = employeeName;
+            if (dateStart) payload.date_range_start = dateStart;
+            if (dateEnd) payload.date_range_end = dateEnd;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/ai/summarize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showResult('summarizeResult', data, !data.success);
+            } catch (error) {
+                showResult('summarizeResult', { error: error.message }, true);
+            } finally {
+                setLoading('summarizeBtn', false);
+            }
+        });
+
+        // Report Form
+        document.getElementById('reportForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('reportBtn');
+            btn.setAttribute('data-original-text', btn.textContent);
+            setLoading('reportBtn', true);
+
+            const payload = {
+                report_type: document.getElementById('reportType').value,
+                include_charts: document.getElementById('includeCharts').checked,
+            };
+
+            const dateStart = document.getElementById('reportDateStart').value;
+            const dateEnd = document.getElementById('reportDateEnd').value;
+            const employeeId = document.getElementById('reportEmployeeId').value;
+
+            if (dateStart) payload.date_range_start = dateStart;
+            if (dateEnd) payload.date_range_end = dateEnd;
+            if (employeeId) payload.employee_id = parseInt(employeeId);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/ai/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showResult('reportResult', data, !data.success);
+            } catch (error) {
+                showResult('reportResult', { error: error.message }, true);
+            } finally {
+                setLoading('reportBtn', false);
+            }
+        });
+
+        // Query Form
+        document.getElementById('queryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('queryBtn');
+            btn.setAttribute('data-original-text', btn.textContent);
+            setLoading('queryBtn', true);
+
+            const payload = {
+                query: document.getElementById('queryText').value,
+            };
+
+            const employeeId = document.getElementById('contextEmployeeId').value;
+            const employeeName = document.getElementById('contextEmployeeName').value;
+
+            if (employeeId || employeeName) {
+                payload.context = {};
+                if (employeeId) payload.context.employee_id = parseInt(employeeId);
+                if (employeeName) payload.context.employee_name = employeeName;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/ai/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showResult('queryResult', data, !data.success);
+            } catch (error) {
+                showResult('queryResult', { error: error.message }, true);
+            } finally {
+                setLoading('queryBtn', false);
+            }
+        });
+    </script>
+</body>
+</html>

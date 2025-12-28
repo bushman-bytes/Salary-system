@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 from app.config.config import DATABASE_URL
 from app.models.schema import get_engine, get_session
 from app.ai_agent.knowledge_base_builder import KnowledgeBaseBuilder
+from app.ai_agent.config import AI_PROVIDER, CHROMA_COLLECTION_NAME
 
 
 def main():
@@ -25,6 +26,13 @@ def main():
     print("=" * 60)
     print("AI Agent Knowledge Base Builder")
     print("=" * 60)
+    print()
+    print(f"AI Provider: {AI_PROVIDER}")
+    print(f"Collection Name: {CHROMA_COLLECTION_NAME}")
+    print()
+    print("Note: Collection name is automatically set based on AI provider:")
+    print("  - OpenAI: 'salary_queries' (1536 dimensions)")
+    print("  - Hugging Face: 'salary_queries_hugFace' (384 dimensions)")
     print()
     
     # Validate database connection

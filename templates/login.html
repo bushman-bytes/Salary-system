@@ -1194,12 +1194,26 @@
 
         // Check for remembered admin user and attach form handler
         window.addEventListener('DOMContentLoaded', () => {
-            // Clear any error messages on page load
-            const messageDiv = document.getElementById('message');
-            if (messageDiv) {
-                messageDiv.className = 'message';
-                messageDiv.textContent = '';
-                messageDiv.style.display = 'none';
+            // Check for authentication error messages from dashboard redirects
+            const authError = sessionStorage.getItem('authError');
+            if (authError) {
+                // Display the error message
+                const messageDiv = document.getElementById('message');
+                if (messageDiv) {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = authError;
+                    messageDiv.style.display = 'block';
+                }
+                // Clear the error message from storage after displaying it
+                sessionStorage.removeItem('authError');
+            } else {
+                // Only clear messages if there's no auth error
+                const messageDiv = document.getElementById('message');
+                if (messageDiv) {
+                    messageDiv.className = 'message';
+                    messageDiv.textContent = '';
+                    messageDiv.style.display = 'none';
+                }
             }
 
             // Attach form submission handler

@@ -3,7 +3,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Admin Dashboard - Salary Management System</title>
     <link rel="icon" type="image/jpeg" href="/static/images/logo.jpg">
     <style>
@@ -784,28 +787,63 @@
             display: block;
         }
 
+        /* Mobile-first responsive design */
         @media (max-width: 960px) {
             .main-grid {
                 grid-template-columns: minmax(0, 1fr);
             }
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
             .dashboard-root {
-                padding: 16px;
+                padding: 12px;
             }
 
             .dashboard-shell {
-                padding: 14px;
+                padding: 12px;
+                border-radius: 16px;
             }
 
             .top-bar {
                 flex-direction: column;
                 align-items: flex-start;
+                gap: 12px;
+            }
+
+            .brand-title {
+                font-size: 16px;
+            }
+
+            .brand-subtitle {
+                font-size: 11px;
+            }
+
+            .top-actions {
+                width: 100%;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .logout-btn {
+                font-size: 12px;
+                padding: 8px 14px;
             }
 
             .main-grid {
                 gap: 12px;
+            }
+
+            .panel {
+                padding: 14px 12px 16px;
+                border-radius: 16px;
+            }
+
+            .panel-title {
+                font-size: 14px;
+            }
+
+            .panel-subtitle {
+                font-size: 10px;
             }
 
             .form-grid {
@@ -814,10 +852,197 @@
 
             .stats-row {
                 grid-template-columns: minmax(0, 1fr);
+                gap: 8px;
             }
 
-            .details-grid {
-                grid-template-columns: minmax(0, 1fr) !important;
+            .stat-card {
+                padding: 12px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            .tab {
+                font-size: 11px;
+                padding: 8px 12px;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .sub-tabs {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            .sub-tab {
+                font-size: 11px;
+                padding: 6px 10px;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .table-wrapper.scrollable {
+                max-height: 400px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                font-size: 11px;
+            }
+
+            th, td {
+                padding: 6px 8px;
+                min-width: 80px;
+            }
+
+            .btn {
+                padding: 10px 16px;
+                font-size: 12px;
+                min-height: 44px; /* Better touch target */
+            }
+
+            .notification-container {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+
+            .notification-toast {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dashboard-root {
+                padding: 8px;
+            }
+
+            .dashboard-shell {
+                padding: 10px;
+                border-radius: 12px;
+            }
+
+            .brand-logo {
+                width: 36px;
+                height: 36px;
+            }
+
+            .brand-title {
+                font-size: 14px;
+            }
+
+            .top-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .logout-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .panel {
+                padding: 12px 10px 14px;
+            }
+
+            .panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .tabs {
+                width: 100%;
+            }
+
+            .tab {
+                font-size: 10px;
+                padding: 6px 10px;
+            }
+
+            .sub-tabs {
+                width: 100%;
+            }
+
+            .sub-tab {
+                font-size: 10px;
+                padding: 5px 8px;
+            }
+
+            .form-input,
+            .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px;
+            }
+
+            .form-label {
+                font-size: 10px;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+                padding: 12px 16px;
+                min-height: 48px;
+            }
+
+            .actions-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .stats-row {
+                gap: 6px;
+            }
+
+            .stat-card {
+                padding: 10px;
+            }
+
+            .stat-value {
+                font-size: 14px;
+            }
+
+            table {
+                font-size: 10px;
+            }
+
+            th, td {
+                padding: 5px 6px;
+                font-size: 10px;
+            }
+
+            table .btn {
+                font-size: 10px;
+                padding: 6px 10px;
+                min-height: 36px;
+            }
+
+            .table-wrapper.scrollable {
+                max-height: 300px;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn {
+                min-height: 44px;
+            }
+
+            .tab,
+            .sub-tab {
+                min-height: 36px;
+            }
+
+            .form-input,
+            .form-select,
+            .form-textarea {
+                min-height: 44px;
             }
         }
     </style>
@@ -908,6 +1133,7 @@
                                 Off Days
                                 <span id="offDaysPendingBadge" class="pending-badge" style="display: none;">0</span>
                             </button>
+                            <button class="sub-tab" data-sub-tab="salaryPaymentsSubTab">Salary Payments</button>
                         </div>
 
                         <!-- Advances sub-tab -->
@@ -963,6 +1189,27 @@
                                             <th>Days Worked (Month)</th>
                                             <th>Total Days</th>
                                             <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Filled by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Salary Payments sub-tab -->
+                        <div id="salaryPaymentsSubTab" class="sub-tab-content">
+                            <div class="table-wrapper scrollable">
+                                <table id="salaryPaymentsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Base Salary</th>
+                                            <th>Used Salary</th>
+                                            <th>Remaining Salary</th>
+                                            <th>Payment Date</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -1075,6 +1322,30 @@
     <div id="notificationContainer" class="notification-container"></div>
 
     <script>
+        // ========================================
+        // AUTHENTICATION CHECK - Must be first!
+        // ========================================
+        (function() {
+            // Check if user is logged in
+            const loggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('rememberMe') === 'true';
+            const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+            const requiredRole = 'admin';
+            
+            if (!loggedIn || !userRole) {
+                // Not logged in - redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Check if user has the required role for this dashboard
+            if (userRole.toLowerCase() !== requiredRole.toLowerCase()) {
+                // Wrong role - redirect to login with error message
+                sessionStorage.setItem('authError', `Access denied. This dashboard requires ${requiredRole} role, but you are logged in as ${userRole}.`);
+                window.location.href = '/login';
+                return;
+            }
+        })();
+        
         const API_BASE = window.location.origin.startsWith('http')
             ? window.location.origin
             : 'http://localhost:8000';
@@ -1163,25 +1434,198 @@
             }
         }
 
+        async function loadSalaryPayments() {
+            try {
+                // Load employees if not already loaded (needed for admin ID)
+                if (!allEmployees || allEmployees.length === 0) {
+                    await loadEmployeesForVerification();
+                }
+                // Reuse salary summary data for the payments table
+                if (!salaryRows || salaryRows.length === 0) {
+                    await loadSalarySummary();
+                }
+                renderSalaryPaymentsTable();
+            } catch (err) {
+                console.error('Error loading salary payments:', err);
+                renderSalaryPaymentsTable();
+            }
+        }
+
+        function renderSalaryPaymentsTable() {
+            const tbody = document.querySelector('#salaryPaymentsTable tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            if (!salaryRows || salaryRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">No employees found</td></tr>';
+                return;
+            }
+            
+            salaryRows.forEach(row => {
+                const tr = document.createElement('tr');
+                const remaining = parseFloat(row.remaining_salary || 0);
+                const remainingClass = remaining < 0 ? 'amount-negative' : 'amount-positive';
+                const remainingDisplay = formatCurrency(row.remaining_salary);
+                
+                // Get current logged-in admin ID from session storage
+                let adminId = null;
+                const loggedInEmployeeIdStr = sessionStorage.getItem('employeeId') || localStorage.getItem('employeeId');
+                if (loggedInEmployeeIdStr) {
+                    const loggedInEmployeeId = parseInt(loggedInEmployeeIdStr, 10);
+                    if (!isNaN(loggedInEmployeeId)) {
+                        const loggedInUser = allEmployees.find(e => e.id === loggedInEmployeeId);
+                        if (loggedInUser && loggedInUser.role && loggedInUser.role.toLowerCase() === 'admin') {
+                            adminId = loggedInUser.id;
+                        }
+                    }
+                }
+                
+                // Fallback: Find any admin from employees list if current user not found or not admin
+                if (!adminId) {
+                    const admin = allEmployees.find(e => e.role && e.role.toLowerCase() === 'admin');
+                    adminId = admin ? admin.id : null;
+                }
+                
+                if (!adminId) {
+                    console.error('No admin found to record salary payment. Current user must be an admin.');
+                }
+                
+                // Escape single quotes in names for onclick handler
+                const safeFirstName = (row.first_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const safeLastName = (row.last_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const employeeFullName = `${safeFirstName} ${safeLastName}`;
+                
+                const isDisabled = !adminId || remaining <= 0;
+                const disabledAttr = isDisabled ? 'disabled style="opacity: 0.5;"' : '';
+                const titleAttr = !adminId ? 'title="Admin ID not found. Please log in as an admin."' : '';
+                const onclickAttr = !isDisabled ? `onclick="paySalary(${row.employee_id}, ${adminId}, '${employeeFullName}')"` : '';
+                
+                tr.innerHTML = `
+                    <td>${row.first_name} ${row.last_name}</td>
+                    <td>${formatCurrency(row.salary)}</td>
+                    <td class="amount-negative">${formatCurrency(row.used_salary)}</td>
+                    <td class="${remainingClass}">${remainingDisplay}</td>
+                    <td>-</td>
+                    <td>
+                        <button class="btn btn-success" ${disabledAttr} ${titleAttr} ${onclickAttr}>
+                            Pay Salary
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function paySalary(employeeId, adminId, employeeName) {
+            // Validate adminId is a valid number
+            const adminIdNum = parseInt(adminId, 10);
+            if (!adminId || isNaN(adminIdNum) || adminIdNum <= 0) {
+                showNotification('error', 'Permission Error', 'Admin ID not found. Please log in as an admin to record salary payments.');
+                console.error('Invalid adminId:', adminId);
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to pay salary for ${employeeName}? This will reset their used salary to 0.`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/salary-payments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        employee_id: parseInt(employeeId, 10),
+                        admin_id: adminIdNum, // Use parsed admin ID
+                        amount_paid: null, // Will pay remaining salary automatically
+                        payment_date: null, // Will use today
+                        notes: null
+                    })
+                });
+                
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || `Failed to pay salary (${res.status})`);
+                }
+                
+                const payment = await res.json();
+                showNotification('success', 'Salary Paid', `Salary payment recorded for ${employeeName}. Amount: ${formatCurrency(payment.amount_paid)}`);
+                
+                // Reload salary summary and payments table
+                await loadSalarySummary();
+                await loadSalaryPayments();
+            } catch (err) {
+                console.error('Error paying salary:', err);
+                showNotification('error', 'Payment Failed', err.message || 'Failed to record salary payment');
+            }
+        }
+
         async function loadEmployeesForVerification() {
             try {
+                console.log('Loading employees from:', `${API_BASE}/api/employees`);
                 const res = await fetch(`${API_BASE}/api/employees`);
+                
                 if (!res.ok) {
-                    throw new Error(`Failed to load employees (${res.status})`);
+                    const errorText = await res.text();
+                    console.error('API Error Response:', errorText);
+                    throw new Error(`Failed to load employees (${res.status}): ${errorText}`);
                 }
+                
                 const data = await res.json();
                 allEmployees = Array.isArray(data) ? data : [];
 
+                console.log('Loaded employees:', allEmployees); // Debug log
+
                 const select = document.getElementById('verifyUserSelect');
+                if (!select) {
+                    console.error('verifyUserSelect element not found');
+                    return;
+                }
+                
                 select.innerHTML = '<option value=\"\">Choose an employee</option>';
+                
+                if (allEmployees.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No employees found';
+                    opt.disabled = true;
+                    select.appendChild(opt);
+                    return;
+                }
+                
                 allEmployees.forEach(emp => {
+                    // Handle role - it might be an enum object or string
+                    let roleValue = emp.role;
+                    if (typeof emp.role === 'object' && emp.role !== null) {
+                        roleValue = emp.role.value || emp.role.name || 'unknown';
+                    }
+                    
+                    // Ensure we have the required fields
+                    const firstName = emp.first_name || 'Unknown';
+                    const lastName = emp.last_name || '';
+                    const role = String(roleValue || 'unknown').toLowerCase();
+                    
                     const opt = document.createElement('option');
                     opt.value = emp.id;
-                    opt.textContent = `${emp.first_name} ${emp.last_name} (${emp.role})`;
+                    opt.textContent = `${firstName} ${lastName} (${role})`;
                     select.appendChild(opt);
                 });
             } catch (err) {
                 console.error('Error loading employees for verification:', err);
+                const select = document.getElementById('verifyUserSelect');
+                if (select) {
+                    const errorMsg = err.message || 'Error loading employees';
+                    select.innerHTML = `<option value=\"\">${errorMsg}</option>`;
+                    // Show error message to user
+                    const messageEl = document.getElementById('userVerificationMessage');
+                    if (messageEl) {
+                        messageEl.textContent = `Failed to load employees: ${errorMsg}`;
+                        messageEl.className = 'inline-message error';
+                        messageEl.style.display = 'block';
+                    }
+                }
             }
         }
 
@@ -1259,8 +1703,17 @@
                 return;
             }
 
-            roleEl.textContent = emp.role.charAt(0).toUpperCase() + emp.role.slice(1);
-            roleEl.className = `pill pill-role ${emp.role}`;
+            // Handle role - it might be an enum object or string
+            let roleValue = emp.role;
+            if (typeof emp.role === 'object' && emp.role !== null) {
+                roleValue = emp.role.value || emp.role.name || 'unknown';
+            }
+            
+            // Ensure role is a string
+            roleValue = String(roleValue || 'unknown').toLowerCase();
+            
+            roleEl.textContent = roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
+            roleEl.className = `pill pill-role ${roleValue}`;
 
             // Fetch existing PIN from database
             try {
@@ -1813,6 +2266,8 @@
                             loadBills();
                         } else if (targetId === 'offDaysSubTab') {
                             loadOffDays();
+                        } else if (targetId === 'salaryPaymentsSubTab') {
+                            loadSalaryPayments();
                         }
                     }
                 });

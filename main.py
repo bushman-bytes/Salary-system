@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pathlib import Path
 import os
 
@@ -26,8 +26,14 @@ from app.models.schema import (
     OffDay,
     OffDayStatus,
     UserAuth,
+    SalaryPayment,
 )
 from app.utils.attendance import update_employee_attendance
+from app.services.salary_payment_service import (
+    record_salary_payment,
+    get_employee_salary_payments,
+    get_all_salary_payments,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +119,7 @@ def calculate_remaining_salary(employee_id: int, db: Session) -> float:
 class EmployeeBase(BaseModel):
     first_name: str = Field(..., max_length=100)
     last_name: str = Field(..., max_length=100)
-    role: Literal["staff", "manager"]
+    role: Literal["staff", "manager", "admin"]
     salary: float = Field(..., gt=0)
     phone_no: str = Field(..., max_length=20)
     employment_start_date: Optional[date] = None
@@ -136,6 +142,8 @@ class EmployeeOut(EmployeeBase):
         """Convert Role enum to string value before validation."""
         if isinstance(v, Role):
             return v.value
+        if isinstance(v, str):
+            return v.lower()
         return v
 
 
@@ -234,6 +242,47 @@ class LoginResponse(BaseModel):
     last_name: Optional[str] = None
     role: str
     dashboard: str
+
+
+# ---------------------------------------------------------------------------
+# AI Agent Request/Response Models
+# ---------------------------------------------------------------------------
+
+class SummarizeRequest(BaseModel):
+    """Request model for AI summarize endpoint."""
+    query_type: Literal["employee", "department", "time_period", "status"] = Field(
+        ..., description="Type of summary to generate"
+    )
+    employee_id: Optional[int] = Field(None, description="Employee ID (for employee summary)")
+    employee_name: Optional[str] = Field(None, description="Employee name (for employee summary)")
+    date_range_start: Optional[date] = Field(None, description="Start date for time period")
+    date_range_end: Optional[date] = Field(None, description="End date for time period")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Additional filters")
+
+
+class ReportRequest(BaseModel):
+    """Request model for AI report endpoint."""
+    report_type: Literal["financial", "operational", "analytical"] = Field(
+        ..., description="Type of report to generate"
+    )
+    date_range_start: Optional[date] = Field(None, description="Start date for report")
+    date_range_end: Optional[date] = Field(None, description="End date for report")
+    employee_id: Optional[int] = Field(None, description="Optional employee filter")
+    include_charts: bool = Field(False, description="Include chart data in response")
+
+
+class QueryRequest(BaseModel):
+    """Request model for natural language query endpoint."""
+    query: str = Field(..., min_length=1, description="Natural language question or query")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context for the query")
+
+
+class AIResponse(BaseModel):
+    """Base response model for AI endpoints."""
+    success: bool
+    result: Any = Field(..., description="AI-generated result")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata about the generation")
+    error: Optional[str] = Field(None, description="Error message if generation failed")
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +388,12 @@ def manager_dashboard_self():
     return FileResponse(str(templates_dir / "manager_dashboard_self.html"))
 
 
+@app.get("/agent-dashboard", tags=["pages"])
+def agent_dashboard():
+    """Serve AI agent testing dashboard."""
+    return FileResponse(str(templates_dir / "agent_dashboard.html"))
+
+
 @app.get("/health", tags=["system"])
 def health_check(db: Session = Depends(get_db)):
     """Simple health check & DB connectivity test."""
@@ -385,8 +440,39 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/employees", response_model=List[EmployeeOut], tags=["employees"])
 def list_employees(db: Session = Depends(get_db)):
-    qs = db.query(Employee).order_by(Employee.first_name, Employee.last_name).all()
-    return qs
+    try:
+        qs = db.query(Employee).order_by(Employee.first_name, Employee.last_name).all()
+        
+        # Manually convert to EmployeeOut instances to ensure role is properly serialized
+        result = []
+        for emp in qs:
+            # Convert role enum to string
+            role_value = emp.role.value if hasattr(emp.role, 'value') else str(emp.role)
+            
+            # Create EmployeeOut instance with converted role
+            employee_out = EmployeeOut(
+                id=emp.id,
+                first_name=emp.first_name,
+                last_name=emp.last_name,
+                role=role_value,  # Already converted to string
+                salary=float(emp.salary),
+                phone_no=emp.phone_no,
+                employment_start_date=emp.employment_start_date,
+                days_worked_this_month=emp.days_worked_this_month,
+                total_days_worked=emp.total_days_worked,
+            )
+            result.append(employee_out)
+        
+        return result
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in list_employees: {str(e)}")
+        print(f"Traceback: {error_details}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error loading employees: {str(e)}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -945,6 +1031,133 @@ def get_salary_summary(db: Session = Depends(get_db)):
     return results
 
 
+# ---------------------------------------------------------------------------
+# Salary Payments
+# ---------------------------------------------------------------------------
+
+class SalaryPaymentCreate(BaseModel):
+    employee_id: int
+    admin_id: int
+    amount_paid: Optional[float] = None  # If not provided, pays remaining salary
+    payment_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+class SalaryPaymentOut(BaseModel):
+    id: int
+    employee_id: int
+    employee_name: str
+    amount_paid: float
+    payment_date: date
+    notes: Optional[str] = None
+    paid_by_id: int
+    paid_by_name: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@app.post("/api/salary-payments", status_code=status.HTTP_201_CREATED, tags=["salary_payments"])
+def create_salary_payment(payload: SalaryPaymentCreate, db: Session = Depends(get_db)):
+    """
+    Record a salary payment for an employee (admin only).
+    When salary is paid, resets used_salary to 0 (clearing the balance).
+    """
+    try:
+        payment = record_salary_payment(
+            db=db,
+            employee_id=payload.employee_id,
+            admin_id=payload.admin_id,
+            amount_paid=payload.amount_paid,
+            payment_date=payload.payment_date,
+            notes=payload.notes
+        )
+        
+        employee = db.query(Employee).get(payload.employee_id)
+        admin = db.query(Employee).get(payload.admin_id)
+        
+        return SalaryPaymentOut(
+            id=payment.id,
+            employee_id=payment.employee_id,
+            employee_name=f"{employee.first_name} {employee.last_name}",
+            amount_paid=payment.amount_paid,
+            payment_date=payment.payment_date,
+            notes=payment.notes,
+            paid_by_id=payment.paid_by_id,
+            paid_by_name=f"{admin.first_name} {admin.last_name}",
+            created_at=payment.created_at
+        )
+    except ValueError as e:
+        print(f"ValueError in create_salary_payment: {str(e)}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        print(f"PermissionError in create_salary_payment: {str(e)}")
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Unexpected error in create_salary_payment: {str(e)}")
+        print(f"Traceback: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Error recording salary payment: {str(e)}")
+
+
+@app.get("/api/salary-payments", response_model=List[SalaryPaymentOut], tags=["salary_payments"])
+def get_salary_payments(db: Session = Depends(get_db)):
+    """
+    Get all salary payment records (admin only).
+    """
+    payments = get_all_salary_payments(db)
+    
+    results = []
+    for payment in payments:
+        employee = db.query(Employee).get(payment.employee_id)
+        admin = db.query(Employee).get(payment.paid_by_id)
+        
+        results.append(SalaryPaymentOut(
+            id=payment.id,
+            employee_id=payment.employee_id,
+            employee_name=f"{employee.first_name} {employee.last_name}" if employee else "Unknown",
+            amount_paid=payment.amount_paid,
+            payment_date=payment.payment_date,
+            notes=payment.notes,
+            paid_by_id=payment.paid_by_id,
+            paid_by_name=f"{admin.first_name} {admin.last_name}" if admin else "Unknown",
+            created_at=payment.created_at
+        ))
+    
+    return results
+
+
+@app.get("/api/salary-payments/employee/{employee_id}", response_model=List[SalaryPaymentOut], tags=["salary_payments"])
+def get_employee_salary_payments_api(employee_id: int, db: Session = Depends(get_db)):
+    """
+    Get all salary payment records for a specific employee.
+    """
+    employee = db.query(Employee).get(employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    
+    payments = get_employee_salary_payments(db, employee_id)
+    
+    results = []
+    for payment in payments:
+        admin = db.query(Employee).get(payment.paid_by_id)
+        
+        results.append(SalaryPaymentOut(
+            id=payment.id,
+            employee_id=payment.employee_id,
+            employee_name=f"{employee.first_name} {employee.last_name}",
+            amount_paid=payment.amount_paid,
+            payment_date=payment.payment_date,
+            notes=payment.notes,
+            paid_by_id=payment.paid_by_id,
+            paid_by_name=f"{admin.first_name} {admin.last_name}" if admin else "Unknown",
+            created_at=payment.created_at
+        ))
+    
+    return results
+
+
 @app.get(
     "/api/manager/{manager_id}/recent-bills",
     response_model=List[BillOut],
@@ -1085,6 +1298,256 @@ def get_all_off_days(db: Session = Depends(get_db)):
         )
 
     return items
+
+
+# ---------------------------------------------------------------------------
+# AI Agent Endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/ai/summarize", response_model=AIResponse, tags=["ai"])
+@limiter.limit("10/minute")  # Rate limit AI endpoints
+def ai_summarize(
+    request: Request,
+    payload: SummarizeRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate AI-powered summary based on query type.
+    
+    Supported query types:
+    - employee: Summary for a specific employee
+    - department: Aggregate statistics for a department
+    - time_period: Summary for a specific time period
+    - status: Summary of pending/completed transactions
+    """
+    try:
+        from app.ai_agent.report_generator import ReportGenerator
+        
+        # Initialize report generator
+        generator = ReportGenerator(db)
+        
+        # Handle different query types
+        if payload.query_type == "employee":
+            # Build date range tuple if provided
+            date_range = None
+            if payload.date_range_start and payload.date_range_end:
+                date_range = (payload.date_range_start, payload.date_range_end)
+            
+            result = generator.generate_employee_summary(
+                employee_id=payload.employee_id,
+                employee_name=payload.employee_name,
+                date_range=date_range,
+            )
+            
+            if "error" in result:
+                return AIResponse(
+                    success=False,
+                    result=None,
+                    error=result.get("error", "Failed to generate summary"),
+                    metadata=result.get("metadata", {})
+                )
+            
+            return AIResponse(
+                success=True,
+                result=result.get("summary"),
+                metadata=result.get("metadata", {}),
+            )
+        
+        elif payload.query_type == "time_period":
+            # Generate financial report for time period
+            date_range = None
+            if payload.date_range_start and payload.date_range_end:
+                date_range = (payload.date_range_start, payload.date_range_end)
+            
+            result = generator.generate_financial_report(
+                date_range=date_range,
+                employee_id=payload.employee_id,
+            )
+            
+            if "error" in result:
+                return AIResponse(
+                    success=False,
+                    result=None,
+                    error=result.get("error", "Failed to generate summary"),
+                    metadata=result.get("metadata", {})
+                )
+            
+            return AIResponse(
+                success=True,
+                result=result.get("report"),
+                metadata=result.get("metadata", {}),
+            )
+        
+        else:
+            return AIResponse(
+                success=False,
+                result=None,
+                error=f"Query type '{payload.query_type}' not yet implemented",
+            )
+    
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback.print_exc()
+        return AIResponse(
+            success=False,
+            result=None,
+            error=f"Error generating summary: {error_msg}",
+        )
+
+
+@app.post("/api/ai/report", response_model=AIResponse, tags=["ai"])
+@limiter.limit("10/minute")  # Rate limit AI endpoints
+def ai_report(
+    request: Request,
+    payload: ReportRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate AI-powered comprehensive report.
+    
+    Supported report types:
+    - financial: Financial analysis with trends
+    - operational: Operational metrics and workflow status
+    - analytical: Trend analysis and anomaly detection
+    """
+    try:
+        from app.ai_agent.report_generator import ReportGenerator
+        
+        # Initialize report generator
+        generator = ReportGenerator(db)
+        
+        # Build date range tuple if provided
+        date_range = None
+        if payload.date_range_start and payload.date_range_end:
+            date_range = (payload.date_range_start, payload.date_range_end)
+        
+        if payload.report_type == "financial":
+            result = generator.generate_financial_report(
+                date_range=date_range,
+                employee_id=payload.employee_id,
+            )
+            
+            if "error" in result:
+                return AIResponse(
+                    success=False,
+                    result=None,
+                    error=result.get("error", "Failed to generate report"),
+                    metadata=result.get("metadata", {})
+                )
+            
+            return AIResponse(
+                success=True,
+                result=result.get("report"),
+                metadata={
+                    **result.get("metadata", {}),
+                    "include_charts": payload.include_charts,
+                },
+            )
+        
+        else:
+            return AIResponse(
+                success=False,
+                result=None,
+                error=f"Report type '{payload.report_type}' not yet implemented",
+            )
+    
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback.print_exc()
+        return AIResponse(
+            success=False,
+            result=None,
+            error=f"Error generating report: {error_msg}",
+        )
+
+
+@app.post("/api/ai/query", response_model=AIResponse, tags=["ai"])
+@limiter.limit("20/minute")  # Higher limit for natural language queries
+def ai_query(
+    request: Request,
+    payload: QueryRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Natural language query interface for the AI agent.
+    
+    Ask questions in natural language and get AI-powered responses
+    with relevant data from the database.
+    
+    Examples:
+    - "What is the total amount of pending advances?"
+    - "Show me a summary for employee John Doe"
+    - "Generate a financial report for last month"
+    """
+    try:
+        from app.ai_agent.rag_engine import get_rag_engine
+        from app.ai_agent.chains import get_rag_chain
+        from app.ai_agent.query_processor import QueryProcessor
+        
+        # Initialize components
+        rag_engine = get_rag_engine()
+        rag_chain = get_rag_chain()
+        query_processor = QueryProcessor(db)
+        
+        # Retrieve relevant context from knowledge base
+        context_docs = rag_engine.retrieve_context(payload.query)
+        retrieved_context = rag_engine.format_context(context_docs)
+        
+        # Try to extract structured information from query
+        # This is a simple implementation - could be enhanced with NLP
+        query_lower = payload.query.lower()
+        
+        # Check if query is asking for employee data
+        employee_id = None
+        employee_name = None
+        if "employee" in query_lower:
+            # Try to extract employee name or ID from context
+            if payload.context:
+                employee_id = payload.context.get("employee_id")
+                employee_name = payload.context.get("employee_name")
+        
+        # Get relevant data if needed
+        query_data = ""
+        if employee_id or employee_name:
+            try:
+                employee_data = query_processor.get_employee_data(
+                    employee_id=employee_id,
+                    employee_name=employee_name,
+                )
+                if "error" not in employee_data:
+                    import json
+                    query_data = json.dumps(employee_data, indent=2)
+            except:
+                pass
+        
+        # Generate response using RAG chain
+        response = rag_chain.invoke(
+            query=payload.query,
+            context=retrieved_context,
+            query_data=query_data,
+        )
+        
+        return AIResponse(
+            success=True,
+            result=response,
+            metadata={
+                "query": payload.query,
+                "context_used": len(context_docs) > 0,
+                "context_docs_count": len(context_docs),
+            },
+        )
+    
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback.print_exc()
+        return AIResponse(
+            success=False,
+            result=None,
+            error=f"Error processing query: {error_msg}",
+        )
 
 
 if __name__ == "__main__":

@@ -90,7 +90,6 @@ def approve_advance(
     
     # Update status
     advance.status = AdvanceStatus.APPROVED if approved else AdvanceStatus.DENIED
-    advance.approved_by_id = admin_id
     advance.approved_at = datetime.utcnow()
     advance.approval_notes = notes
     
